@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏀 Liga Automática de Baloncesto</title>
+<title>🏀 Sistema Automático - Liga de Baloncesto</title>
 <style>
 body {font-family: Arial; background:#111; color:#eee; margin:0; padding:20px;}
 h1 {text-align:center; color:#ff9800;}
@@ -79,6 +79,7 @@ let standby = [];
 let matchNumber = 1;
 let consecutiveWins = 0;
 
+// === FUNCIONES BASE ===
 function parseList(txt) {
   return txt.split(/,|\n/).map(n=>n.trim()).filter(n=>n.length>0);
 }
@@ -86,23 +87,30 @@ function parseList(txt) {
 function iniciarLiga() {
   liga = parseList(document.getElementById('ligaInput').value);
   invitados = parseList(document.getElementById('invInput').value);
-  if(liga.length < 5){ alert("Se necesitan al menos 5 jugadores de la liga"); return; }
-  document.getElementById('setup').style.display="none";
-  document.getElementById('gamePanel').style.display="block";
+
+  if (liga.length < 5) {
+    alert("Se necesitan al menos 5 jugadores de la liga.");
+    return;
+  }
+
+  document.getElementById('setup').style.display = "none";
+  document.getElementById('gamePanel').style.display = "block";
+
   iniciarPartido();
 }
 
 function agregarJugador(tipo){
-  if(tipo==='liga'){
-    let nombre=document.getElementById('nuevoLiga').value.trim();
-    if(nombre){ liga.push(nombre); document.getElementById('nuevoLiga').value=''; }
-  }else{
-    let nombre=document.getElementById('nuevoInv').value.trim();
-    if(nombre){ invitados.push(nombre); document.getElementById('nuevoInv').value=''; }
+  if (tipo==='liga'){
+    const nombre = document.getElementById('nuevoLiga').value.trim();
+    if (nombre){ liga.push(nombre); document.getElementById('nuevoLiga').value=''; }
+  } else {
+    const nombre = document.getElementById('nuevoInv').value.trim();
+    if (nombre){ invitados.push(nombre); document.getElementById('nuevoInv').value=''; }
   }
   render();
 }
 
+// === LÓGICA DE ROTACIÓN ===
 function tomarJugadores(lista, n){
   let arr=[];
   for(let i=0;i<n;i++){
@@ -114,62 +122,80 @@ function tomarJugadores(lista, n){
 
 function completarJugadores(n){
   let jugadores = tomarJugadores(liga, n);
-  if(jugadores.length < n){
-    let faltan = n - jugadores.length;
-    jugadores = jugadores.concat(tomarJugadores(invitados, faltan));
+  if (jugadores.length < n) {
+    jugadores = jugadores.concat(tomarJugadores(invitados, n - jugadores.length));
   }
   return jugadores;
 }
 
 function iniciarPartido(){
-  if(standby.length===5){ champion=standby; standby=[]; consecutiveWins=0; }
-  if(champion.length===0){ // Primer partido
-    let primeros = completarJugadores(10);
+  // Si hay equipo en standby, vuelve a ser campeón
+  if (standby.length === 5) {
+    champion = standby;
+    standby = [];
+    consecutiveWins = 0;
+  }
+
+  if (matchNumber === 1) {
+    // Primer partido: solo liga (10 primeros)
+    const primeros = completarJugadores(10);
     champion = primeros.slice(0,5);
     retador = primeros.slice(5,10);
-  }else{
-    retador = completarJugadores(5);
+  } else {
+    // Siguientes partidos: 3 liga + 2 invitados
+    const ligaPart = completarJugadores(3);
+    const invPart = tomarJugadores(invitados, 2);
+    const total = ligaPart.concat(invPart);
+    // Si faltan invitados, completa con liga
+    while (total.length < 5) {
+      const extra = tomarJugadores(liga, 1);
+      if (extra.length) total.push(extra[0]);
+      else break;
+    }
+    retador = total;
   }
+
   render();
 }
 
+// === RESULTADOS ===
 function winner(team){
-  if(team==='A'){
+  if (team === 'A'){
     consecutiveWins++;
+    // Retador pierde → vuelve a sus colas
     enviarPerdedoresACola(retador);
-    if(consecutiveWins===2){
-      standby=champion;
-      champion=[];
-      consecutiveWins=0;
+
+    if (consecutiveWins === 2){
+      standby = champion;
+      champion = [];
+      consecutiveWins = 0;
       generar10Nuevos();
       return;
     }
-  }else{
+  } else {
+    // Campeón pierde → va a la cola
     enviarPerdedoresACola(champion);
     champion = retador;
-    consecutiveWins=1;
+    consecutiveWins = 1;
   }
+
   matchNumber++;
   iniciarPartido();
 }
 
 function enviarPerdedoresACola(equipo){
   equipo.forEach(j=>{
-    if(liga.indexOf(j)===-1 && invitados.indexOf(j)===-1){
-      // Decidimos si es liga o invitado: si estaba originalmente
-      // los que ya están en listas originales no se duplican
-      // Si el nombre parece de invitado
-      if(document.getElementById('invInput').value.includes(j)) invitados.push(j);
+    if (!liga.includes(j) && !invitados.includes(j)) {
+      if (document.getElementById('invInput').value.includes(j)) invitados.push(j);
       else liga.push(j);
     }
   });
 }
 
 function generar10Nuevos(){
-  // Crear nuevos 10 diferentes de los que estaban en cancha
-  let jugadores = completarJugadores(10);
-  champion = jugadores.slice(0,5);
-  retador = jugadores.slice(5,10);
+  const nuevos = completarJugadores(10);
+  champion = nuevos.slice(0,5);
+  retador = nuevos.slice(5,10);
   matchNumber++;
   render();
 }
@@ -180,7 +206,7 @@ function render(){
   document.getElementById("ligaList").textContent = liga.join(", ")||"Vacío";
   document.getElementById("invList").textContent = invitados.join(", ")||"Vacío";
   document.getElementById("standbyList").textContent = standby.join(", ")||"Ninguno";
-  document.getElementById("status").innerHTML=`<h2>Partido ${matchNumber}</h2><p>Racha del campeón: ${consecutiveWins}</p>`;
+  document.getElementById("status").innerHTML = `<h2>Partido ${matchNumber}</h2><p>Racha del campeón: ${consecutiveWins}</p>`;
 }
 </script>
 </body>
